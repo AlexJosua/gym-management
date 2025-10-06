@@ -15,29 +15,37 @@ import (
 var DB *gorm.DB
 
 func InitDB() {
-	// Load .env
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("⚠️ Tidak bisa load .env, lanjut pakai environment system")
+
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️  Tidak bisa load .env, lanjut pakai environment system")
 	}
 
-	// Build DSN
-	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_PORT"),
-	)
+	databaseURL := os.Getenv("DATABASE_URL")
 
-	// Koneksi ke database
+	var dsn string
+	if databaseURL != "" {
+
+		dsn = databaseURL
+		log.Println("🌐 Menggunakan DATABASE_URL dari Railway")
+	} else {
+
+		dsn = fmt.Sprintf(
+			"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+			os.Getenv("DB_HOST"),
+			os.Getenv("DB_USER"),
+			os.Getenv("DB_PASSWORD"),
+			os.Getenv("DB_NAME"),
+			os.Getenv("DB_PORT"),
+		)
+		log.Println("💻 Menggunakan konfigurasi lokal dari .env")
+	}
+
+	
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Panic("❌ Gagal koneksi ke database:", err)
 	}
 
-	// Auto migrate semua model
 	modelsToMigrate := []interface{}{
 		&models.User{},
 		&models.Membership{},
@@ -45,13 +53,10 @@ func InitDB() {
 		&models.WorkoutSession{},
 	}
 
-	for _, model := range modelsToMigrate {
-		if err := db.AutoMigrate(model); err != nil {
-			log.Panicf("❌ Gagal migrasi model %T: %v", model, err)
-		}
+	if err := db.AutoMigrate(modelsToMigrate...); err != nil {
+		log.Panicf("❌ Gagal migrasi model: %v", err)
 	}
 
-	// Assign ke variabel global
 	DB = db
-	fmt.Println("✅ Database terkoneksi & migrasi semua model berhasil!")
+	log.Println("✅ Database terkoneksi & semua tabel berhasil dimigrasi!")
 }
